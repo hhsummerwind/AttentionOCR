@@ -8,6 +8,7 @@ import time
 import argparse
 import numpy as np
 from matplotlib import pyplot as plt
+import pdb
 
 import config as cfg
 import tensorflow as tf
@@ -29,23 +30,27 @@ class TextRecognition(object):
                 graph_def = tf.GraphDef()
                 graph_def.ParseFromString(f.read())
                 _ = tf.import_graph_def(graph_def, name='')
-        
-        
+        #         tensor_name = [tensor.name for tensor in graph_def.node]
+        #         print('\n'.join(tensor_name))
+        #         print('---------------------------')
+        #
         self.sess = tf.Session(graph=self.graph)
         
         self.img_ph = self.sess.graph.get_tensor_by_name('image:0')
-        self.label_ph = self.sess.graph.get_tensor_by_name('label:0')
+        # print("hh, input image tensor shape = {}".format(self.img_ph.shape))
+        # self.label_ph = self.sess.graph.get_tensor_by_name('ones:0')
         self.is_training = self.sess.graph.get_tensor_by_name('is_training:0')
-        self.dropout = self.sess.graph.get_tensor_by_name('dropout_keep_prob:0')
+        self.dropout = self.sess.graph.get_tensor_by_name('dropout:0')
         self.preds = self.sess.graph.get_tensor_by_name('sequence_preds:0')
         self.probs = self.sess.graph.get_tensor_by_name('sequence_probs:0')
         
     def predict(self, image, label_dict, EOS='EOS'):
         results = []
         probabilities = []
-        
+        # pdb.set_trace()
+
         pred_sentences, pred_probs = self.sess.run([self.preds, self.probs], \
-                    feed_dict={self.is_training: False, self.dropout: 1.0, self.img_ph: image, self.label_ph: np.ones((1,self.seq_len), np.int32)})
+                    feed_dict={self.is_training: False, self.dropout: 1.0, self.img_ph: image})
 
         for char in pred_sentences[0]:
             if label_dict[char] == EOS:
@@ -114,8 +119,8 @@ def test(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='OCR')
 
-    parser.add_argument('--pb_path', type=str, help='path to tensorflow pb model', default='./checkpoint/text_recognition_5435.pb')
-    parser.add_argument('--img_folder', type=str, help='path to image folder', default='/opt/data/nfs/zhangjinjin/data/text/art/test_part1_task2_images')
+    parser.add_argument('--pb_path', type=str, help='path to tensorflow pb model', default='/data/models/text_recognition/AttentionOCR/text_recognition_5435.pb')
+    parser.add_argument('--img_folder', type=str, help='path to image folder', default='/data/datasets/tianji/jihe/gongzhang')
     
     args = parser.parse_args()
     test(args)

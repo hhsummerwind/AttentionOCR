@@ -9,13 +9,14 @@ from tensorflow.contrib import slim
 from tensorflow.contrib.layers import xavier_initializer
 from model.inception_v4 import *
 import time
+import pdb
 
 relu = tf.nn.relu
   
 def conv(x, channels, kernel_size, stride, scope, normalizer_fn=slim.batch_norm, activation_fn=relu):
     return slim.conv2d(x, channels, kernel_size, stride, scope=scope, normalizer_fn=normalizer_fn, activation_fn=activation_fn)
 
-def inception_padding_model(images, labels, wemb_size, seq_len, num_classes, lstm_size, is_training=True, 
+def inception_padding_model(images, labels, wemb_size, seq_len, num_classes, lstm_size, is_training=True,
         dropout_keep_prob=0.5, weight_decay=0.00004, final_endpoint='Mixed_6h', name='InceptionV4', reuse=None):
     """
     Core default tensorflow model for text recognition.
@@ -37,6 +38,7 @@ def inception_padding_model(images, labels, wemb_size, seq_len, num_classes, lst
         output_array: (batch, seq_len, num_classes) logits
         attention_array: (batch, h, w, seq_len) attention feature map
     """
+    # pdb.set_trace()
     with tf.compat.v1.variable_scope(name, reuse=reuse) as scope:
         regularizer = slim.l2_regularizer(weight_decay)
         with slim.arg_scope(inception_v4_arg_scope()):
@@ -88,6 +90,7 @@ def inception_padding_model(images, labels, wemb_size, seq_len, num_classes, lst
                     attention_feature  :           (batch, channel)
                     c_prev  :                      (batch, lstm_size)
                     """
+                    # pdb.set_trace()
                     pack = tf.add_n([tf.matmul(wemb_prev, lstm_W), tf.matmul(h_prev, lstm_U), tf.matmul(attention_feature, lstm_Z)])
                     pack_with_bias = tf.nn.bias_add(pack, lstm_b)   # (bsize, hid_dim * 4)
                     i, f, o, g = tf.split(pack_with_bias, num_or_size_splits=4, axis=1) # (bsize, hid_dim)
@@ -121,6 +124,7 @@ def inception_padding_model(images, labels, wemb_size, seq_len, num_classes, lst
                         attention_array: attention feature map TensorArray at time step i 
                     """
                     # Bahdanau/Additive Attention Mechanism, refer to https://arxiv.org/pdf/1409.0473.pdf.
+                    # pdb.set_trace()
                     attention_x = tf.reshape(cnn_feature, [-1, channel])
                     attention_x = tf.matmul(attention_x, W)
                     attention_x = tf.reshape(attention_x, [-1, height*width, channel])  #(batch, h*w, channel)
@@ -349,7 +353,7 @@ def inception_model(images, labels, bboxes, wemb_size, seq_len, num_classes, lst
 
             
 if __name__=='__main__':
-    os.environ['CUDA_VISIBILE_DEVICES']='9'
+    os.environ['CUDA_VISIBILE_DEVICES']='0'
     
     size = 256
     input_placeholder = tf.compat.v1.placeholder(tf.float32, [1, size, size, 3]) 

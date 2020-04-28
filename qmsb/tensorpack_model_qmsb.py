@@ -31,10 +31,10 @@ class AttentionOCR(ModelDesc):
     Attention based method for arbitrary-shaped text recognition.
     """
     def inputs(self):
-        return [tf.TensorSpec([None, cfg.image_size, cfg.image_size, 3], tf.float32, 'image'),
+        return [tf.TensorSpec([None, cfg.image_size, cfg.image_size, 1], tf.float32, 'image'),
                 tf.TensorSpec([None, cfg.seq_len+1], tf.int32, 'label'),
-                tf.TensorSpec([None, cfg.seq_len+1], tf.float32, 'mask'),
-                tf.TensorSpec([None, 4], tf.float32, 'normalized_bbox'),
+                # tf.TensorSpec([None, cfg.seq_len+1], tf.float32, 'mask'),
+                # tf.TensorSpec([None, 4], tf.float32, 'normalized_bbox'),
                 tf.TensorSpec([], tf.bool, 'is_training'),
                 tf.TensorSpec([], tf.float32, 'dropout_keep_prob')]
 
@@ -56,24 +56,24 @@ class AttentionOCR(ModelDesc):
             inputs, outputs = ['image', 'label', 'normalized_bbox', 'is_training', 'dropout_keep_prob'], ['sequence_preds', 'sequence_probs']
         return inputs, outputs
 
-    def build_graph(self, image, label, mask, normalized_bbox, is_training, dropout_keep_prob):
+    def build_graph(self, image, label, is_training, dropout_keep_prob):
         if cfg.model_name == 'ocr':
             outputs, attentions = inception_padding_model(image, label, \
                 wemb_size=cfg.wemb_size, seq_len=cfg.seq_len+1, num_classes=cfg.num_classes, \
                 lstm_size=cfg.lstm_size, is_training=is_training, dropout_keep_prob=dropout_keep_prob, \
                 weight_decay=cfg.weight_decay, name=cfg.name_scope, reuse=None)
 
-        elif cfg.model_name == 'ocr_with_normalized_bbox':
-            outputs, attentions = inception_model(image, label, normalized_bbox, \
-                wemb_size=cfg.wemb_size, seq_len=cfg.seq_len+1, num_classes=cfg.num_classes, \
-                lstm_size=cfg.lstm_size, is_training=is_training, dropout_keep_prob=dropout_keep_prob, \
-                weight_decay=cfg.weight_decay, name=cfg.name_scope, reuse=None)
+        # elif cfg.model_name == 'ocr_with_normalized_bbox':
+        #     outputs, attentions = inception_model(image, label, normalized_bbox, \
+        #         wemb_size=cfg.wemb_size, seq_len=cfg.seq_len+1, num_classes=cfg.num_classes, \
+        #         lstm_size=cfg.lstm_size, is_training=is_training, dropout_keep_prob=dropout_keep_prob, \
+        #         weight_decay=cfg.weight_decay, name=cfg.name_scope, reuse=None)
 
         def _step_loss(k, total_xen_loss):
             # cross_entropy_loss = tf.compat.v1.losses.sparse_softmax_cross_entropy(label[:,k], outputs[:,k,:])
             label_smoothed = label_smoothing(tf.one_hot(label[:,k], cfg.num_classes, axis=-1))
             cross_entropy_loss = tf.nn.softmax_cross_entropy_with_logits(logits=outputs[:,k,:], labels=label_smoothed)
-            cross_entropy_loss *= mask[:,k]
+            # cross_entropy_loss *= mask[:,k]
             return k+1, total_xen_loss + cross_entropy_loss
 
         _, cross_entropy_loss = tf.while_loop(
@@ -82,7 +82,8 @@ class AttentionOCR(ModelDesc):
             loop_vars=(tf.constant(0, tf.int32), tf.constant(np.zeros(cfg.batch_size), tf.float32))
         )
 
-        cross_entropy_loss = tf.reduce_sum(cross_entropy_loss) / tf.reduce_sum(mask)
+        # cross_entropy_loss = tf.reduce_sum(cross_entropy_loss) / tf.reduce_sum(mask)
+        cross_entropy_loss = tf.reduce_mean(cross_entropy_loss)
         reg_loss = tf.add_n(tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.REGULARIZATION_LOSSES))
 
         total_loss = reg_loss + cross_entropy_loss
@@ -95,8 +96,8 @@ class AttentionOCR(ModelDesc):
         tf.compat.v1.summary.scalar('reg_loss', reg_loss)
         tf.compat.v1.summary.scalar('total_loss', total_loss)
 
-        tf.compat.v1.summary.tensor_summary('mask', mask[0,:], summary_description='mask')
-        tf.compat.v1.summary.text('mask', tf.as_string(mask[0,:]))
+        # tf.compat.v1.summary.tensor_summary('mask', mask[0,:], summary_description='mask')
+        # tf.compat.v1.summary.text('mask', tf.as_string(mask[0,:]))
         tf.compat.v1.summary.tensor_summary('label', label[0,:], summary_description='label')
         tf.compat.v1.summary.text('label', tf.as_string(label[0,:]))
 

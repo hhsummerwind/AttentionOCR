@@ -9,9 +9,10 @@ import tensorflow as tf
 import time
 import argparse
 import pdb
-import config as cfg
-from model.tensorpack_model import *
-from text_dataflow import get_roidb, get_batch_train_dataflow
+from qmsb import config_qmsb as cfg
+# from model.tensorpack_model import *
+from qmsb.tensorpack_model_qmsb import *
+from qmsb.text_dataflow_qmsb import get_roidb, get_batch_train_dataflow
 
 from tensorpack import *
 

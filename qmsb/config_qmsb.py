@@ -4,7 +4,7 @@ import os
 from parse_dict import get_dict
 
 # base dir for multiple text datasets
-base_dir = '/data/datasets/text_recognition/AttentionOCR/'
+# base_dir = '/data/datasets/text_recognition/AttentionOCR/'
 
 # font path for visualization
 font_path = './fonts/cn/SourceHanSans-Normal.ttf'
@@ -14,13 +14,13 @@ font_path = './fonts/cn/SourceHanSans-Normal.ttf'
 model_name = 'ocr' # 'ocr_with_normalized_bbox'
 
 # path for tensorboard summary and checkpoint path 
-summary_path = '/data/models/text_recognition/AttentionOCR/checkpoint'
+summary_path = '/data/models/text_recognition/AttentionOCR/qmsb_checkpoint'
 
 # tensorflow model name scope
 name_scope = 'InceptionV4'
 
 # path for numpy dict with processed image paths and labels used in dataset.py
-dataset_name = '/data/datasets/text_recognition/AttentionOCR/icdar_datasets.npy'
+dataset_name = '/data/datasets/tianji/qmsb/gen_AttentionOCR_data/train_qmsb_datasets.npy'
 # pb_path = './checkpoint/text_recognition_5435.pb'
 
 # restore training parameters
@@ -30,9 +30,11 @@ starting_epoch = 1
 # checkpoint_path = './checkpoint/model-10000'
 # imagenet pretrain model path 
 pretrain_path = '/data/models/inception_v4.ckpt'
+# pretrain_path = ''
 
+label_path = os.path.join(os.path.dirname(__file__), 'label.txt')
 # label dict for text recognition
-label_dict = get_dict()
+label_dict = get_dict(label_path)
 reverse_label_dict = dict((v,k) for k,v in label_dict.items())
 
 # gpu lists
@@ -42,10 +44,10 @@ num_gpus = len(gpus)
 num_classes = len(label_dict)
 
 # max sequence length without EOS 
-seq_len = 32
+seq_len = 8#32
 
 # embedding size
-wemb_size = 128
+wemb_size = 256
 
 # lstm size
 lstm_size = 512
@@ -67,7 +69,7 @@ TRAIN_SHORT_EDGE_SIZE = 8
 MAX_SIZE = image_size - 32
 
 # training batch size
-batch_size = 10 #12
+batch_size = 8 #12
 
 # steps per training epoch in tensorpack
 steps_per_epoch = 500

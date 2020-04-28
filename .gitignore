@@ -1,3 +1,9 @@
 /checkpoint/
 /pretrain/inception_v4.ckpt
 /icdar_datasets.npy
+**/*.jpg
+.idea/
+__pycache__/
+*.pyc
+**/*.png
+**/*.pdf

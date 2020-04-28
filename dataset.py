@@ -9,7 +9,7 @@ import cv2
 from matplotlib import pyplot as plt
 import json
 import codecs
-
+import pdb
 
 from PIL import Image, ImageDraw, ImageFont 
 from sklearn.model_selection import train_test_split
@@ -21,10 +21,10 @@ max_len = cfg.seq_len + 1
 base_dir = cfg.base_dir
 font_path = cfg.font_path
 
-dataset_path = {  'art': os.path.join(base_dir, 'art/train_task2_images'), 
-                  'rects': os.path.join(base_dir, 'rects/img'),
-                  'lsvt': os.path.join(base_dir, 'lsvt/train'),
-                  'icdar2017rctw': os.path.join(base_dir, 'icdar2017rctw/train'), } 
+dataset_path = {  'art': os.path.join(base_dir, 'art/train_task2_images'),}
+                  # 'rects': os.path.join(base_dir, 'rects/img'),
+                  # 'lsvt': os.path.join(base_dir, 'lsvt/train'),
+                  # 'icdar2017rctw': os.path.join(base_dir, 'icdar2017rctw/train'), }
 
 lsvt_annotation = os.path.join(base_dir, 'lsvt/train_full_labels.json')
 art_annotation = os.path.join(base_dir, 'art/train_task2_labels.json')
@@ -167,6 +167,7 @@ class ART(Dataset):
         super(ART, self).__init__(name=name)
 
     def load_data(self, annotation_file=art_annotation):
+        # pdb.set_trace()
         count = 0
         with open(annotation_file) as f:
             json_data = json.load(f)
@@ -236,7 +237,7 @@ class ART(Dataset):
                 self.bboxes.append(bbox)
                 self.points.append(polygon)
 
-        
+
 
 class LSVT(Dataset):
     """
@@ -266,7 +267,7 @@ class LSVT(Dataset):
                         continue
 
                     transcript = preprocess(transcript.strip())
-                
+
 
                     if len(transcript)>self.max_len-1:
                         # print(transcripts)
@@ -283,20 +284,20 @@ class LSVT(Dataset):
 
                     # print(polygon, transcripts)
 
-                    seq_label = []     
+                    seq_label = []
                     for char in transcript:
                         seq_label.append(self.label_dict[char])#.decode('utf-8')
                     seq_label.append(self.label_dict['EOS'])
-                    
+
                     non_zero_count = len(seq_label)
                     seq_label = seq_label + [self.label_dict['EOS']]*(self.max_len-non_zero_count)
-                    mask = [1]*(non_zero_count) + [0]*(self.max_len-non_zero_count) 
+                    mask = [1]*(non_zero_count) + [0]*(self.max_len-non_zero_count)
 
                     points_x = [point[0] for point in polygon]
                     points_y = [point[1] for point in polygon]
                     bbox = [np.amin(points_y), np.amin(points_x), np.amax(points_y), np.amax(points_x)] # ymin, xmin, ymax, xmax
                     bbox = [int(item) for item in bbox]
-                    
+
                     bbox_w, bbox_h = bbox[3]-bbox[1], bbox[2]-bbox[0]
 
                     if bbox_w <8 or bbox_h <8:
@@ -305,7 +306,7 @@ class LSVT(Dataset):
                     # print(transcript, seq_label, mask, polygon)
                     # img = visualization(img_name, polygon, transcript)
                     # plt.imshow(img)
-                    # plt.show()  
+                    # plt.show()
                     self.filenames.append(img_name)
                     self.labels.append(seq_label)
                     self.masks.append(mask)
@@ -382,23 +383,23 @@ class ICDAR2017RCTW(Dataset):
                         self.transcripts.append(label)
 
 if __name__=='__main__':
-    LSVT = LSVT()
-    LSVT.load_data() 
-    print(len(LSVT.filenames))
+    # LSVT = LSVT()
+    # LSVT.load_data()
+    # print(len(LSVT.filenames))
 
     ART = ART()
     ART.load_data()
     print(len(ART.filenames))
 
-    ReCTS = ReCTS()
-    ReCTS.load_data()
-    print(len(ReCTS.filenames))
+    # ReCTS = ReCTS()
+    # ReCTS.load_data()
+    # print(len(ReCTS.filenames))
     
-    filenames = LSVT.filenames + ART.filenames + ReCTS.filenames
-    labels = LSVT.labels + ART.labels + ReCTS.labels
-    masks = LSVT.masks + ART.masks + ReCTS.masks
-    bboxes = LSVT.bboxes + ART.bboxes + ReCTS.bboxes
-    points = LSVT.points + ART.points + ReCTS.points
+    filenames = ART.filenames#LSVT.filenames + ART.filenames + ReCTS.filenames
+    labels = ART.labels#LSVT.labels + ART.labels + ReCTS.labels
+    masks = ART.masks#LSVT.masks + ART.masks + ReCTS.masks
+    bboxes = ART.bboxes#LSVT.bboxes + ART.bboxes + ReCTS.bboxes
+    points = ART.points#LSVT.points + ART.points + ReCTS.points
 
     from sklearn.utils import shuffle
     filenames, labels, masks, bboxes, points = shuffle(filenames, labels, masks, bboxes, points, random_state=0)

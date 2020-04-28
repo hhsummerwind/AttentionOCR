@@ -24,7 +24,8 @@ from common import (
     filter_boxes_inside_shape, np_iou, point8_to_box, polygons_to_mask,
 )
 
-from dataset import LSVT, ART, ReCTS #, TotalText, ICDAR2017RCTW, MLT2019
+from qmsb.dataset_qmsb import QMSB #LSVT, ART, ReCTS #, TotalText, ICDAR2017RCTW, MLT2019
+from qmsb.util import find_blank_side
 
 def largest_size_at_most(height, width, largest_side, max_scale):
     """
@@ -75,11 +76,11 @@ def rotatedPoint(R, point):
     return [int(x), int(y)]
 
 
-def affine_transform(image, polygon):    
+def affine_transform(image):
     """
     Conduct same affine transform for both image and polygon for data augmentation.
     """ 
-    height, width, _ = image.shape
+    height, width = image.shape
     center_x, center_y = width/2, height/2
 
     angle = 0 if np.random.uniform()>0.5 else np.random.uniform(-20., 20.)
@@ -101,16 +102,17 @@ def affine_transform(image, polygon):
     M = np.array([[cos, sin+shear_y,  new_width/2 - center_x + (1-cos)*center_x-(sin+shear_y)*center_y],
                           [-sin+shear_x, cos, new_height/2 - center_y + (sin-shear_x)*center_x+(1-cos)*center_y]])
 
-    rotatedImage = cv2.warpAffine(image, M, (new_width, new_height), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=(0,0,0))
+    rotatedImage = cv2.warpAffine(image, M, (new_width, new_height), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=255)
 
-    height, width = rotatedImage.shape[:2]
-    rotatedPoints = [rotatedPoint(M, point) for point in polygon]
-    mask = polygons_to_mask([np.array(rotatedPoints, np.float32)], new_height, new_width)
-    x, y, w, h = cv2.boundingRect(mask)
-    mask = np.expand_dims(np.float32(mask), axis=-1)
-    rotatedImage = rotatedImage * mask
+    # height, width = rotatedImage.shape[:2]
+    # rotatedPoints = [rotatedPoint(M, point) for point in polygon]
+    # mask = polygons_to_mask([np.array(rotatedPoints, np.float32)], new_height, new_width)
+    # x, y, w, h = cv2.boundingRect(mask)
+    # mask = np.expand_dims(np.float32(mask), axis=-1)
+    # rotatedImage = rotatedImage * mask
     
-    cropImage = rotatedImage[y:y+h, x:x+w,:]
+    # cropImage = rotatedImage[y:y+h, x:x+w,:]
+    cropImage = rotatedImage
 
     return cropImage
 
@@ -123,11 +125,12 @@ class TextDataPreprocessor:
         self.cfg = cfg
 
     def __call__(self, roidb):
-        filename, label, mask, bbox, polygon = roidb['filename'], roidb['label'], roidb['mask'], roidb['bbox'], roidb['polygon'], 
+        filename, label = roidb['filename'], roidb['label']
         img = cv2.imread(filename)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = find_blank_side(img, 5)
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        image = affine_transform(img, polygon)
+        image = affine_transform(img)
         # img = img[bbox[0]:bbox[2], bbox[1]:bbox[3], :] if image.shape[0]<cfg.stride/2 or image.shape[1]<cfg.stride/2 else image
         img = img if image.shape[0]<cfg.stride/2 or image.shape[1]<cfg.stride/2 else image
 
@@ -136,12 +139,12 @@ class TextDataPreprocessor:
 
         img, crop_bbox = padding_image(img, cfg.image_size)
 
-        normalized_bbox = [coord/cfg.image_size for coord in crop_bbox]
+        # normalized_bbox = [coord/cfg.image_size for coord in crop_bbox]
 
         img = img.astype("float32")/255.
 
 
-        ret = {"image": img, "label": label, "mask": mask, "normalized_bbox": normalized_bbox, "is_training":True, "dropout_keep_prob":0.5}
+        ret = {"image": img, "label": label, "is_training":True, "dropout_keep_prob":0.5}
 
         return ret
 
@@ -166,33 +169,13 @@ def get_roidb(dataset_name):
     Load generated numpy dataset for tensorpack dataflow.
     """
     dataset = np.load(dataset_name, allow_pickle=True)[()]
-    filenames, labels, masks, bboxes, points = dataset["filenames"], dataset["labels"], dataset["masks"], dataset["bboxes"], dataset["points"]
+    filenames, labels = dataset["filenames"], dataset["labels"]
 
     roidb = []
-    for filename, label, mask, bbox, polygon in zip(filenames, labels, masks, bboxes, points):
-        item = {"filename":filename, "label":label, "mask":mask, "bbox":bbox, "polygon":polygon}
+    for filename, label in zip(filenames, labels):
+        item = {"filename":filename, "label":label}
         roidb.append(item)
     return roidb
-
-
-def poly2mask(vertex_row_coords, vertex_col_coords, shape):
-    fill_row_coords, fill_col_coords = draw.polygon(vertex_row_coords, vertex_col_coords, shape)
-    mask = np.zeros(shape, dtype=np.bool)
-    mask[fill_row_coords, fill_col_coords] = True
-    return mask
-
-
-def mask_with_points(points, h, w):
-    vertex_row_coords = [point[1] for point in points]  # y
-    vertex_col_coords = [point[0] for point in points]
-
-    mask = poly2mask(vertex_row_coords, vertex_col_coords, (h, w))  # y, x
-    mask = np.float32(mask)
-    mask = np.expand_dims(mask, axis=-1)
-    bbox = [np.amin(vertex_row_coords), np.amin(vertex_col_coords), np.amax(vertex_row_coords),
-            np.amax(vertex_col_coords)]
-    bbox = list(map(int, bbox))
-    return mask, bbox
 
 
 def get_batch_train_dataflow(roidbs, batch_size):
@@ -215,18 +198,19 @@ def get_batch_train_dataflow(roidbs, batch_size):
         """
         datapoint_list = []
         for roidb in roidb_batch:
-            filename, label, mask, bbox, polygon = roidb['filename'], roidb['label'], roidb['mask'], roidb['bbox'], roidb['polygon']
-            img = cv2.imread(filename)
+            filename, label = roidb['filename'], roidb['label']
+            img = cv2.imread(filename, 0)
+            img = find_blank_side(img, 5)
             # img_mask, img_bbox = mask_with_points(polygon, img.shape[0], img.shape[1])
             # masked_image = img * img_mask
             # print("hh: filename = {}, label = {}, mask = {}, bbox = {}, polygon = {}".format(filename, label, mask, bbox, polygon))
             # cv2.imwrite('img.jpg', img)
             # cv2.imwrite('mask.jpg', masked_image)
 
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 
-            image = affine_transform(img, polygon)
+            image = affine_transform(img)
             # cv2.imwrite('tranform.jpg',image[:,:,::-1])
             # sys.exit()
 
@@ -238,15 +222,15 @@ def get_batch_train_dataflow(roidbs, batch_size):
 
             img, crop_bbox = padding_image(img, cfg.image_size)
 
-            normalized_bbox = [coord/cfg.image_size for coord in crop_bbox]
+            # normalized_bbox = [coord/cfg.image_size for coord in crop_bbox]
 
-            img = img.astype("float32")/255.
+            img = np.expand_dims(img.astype("float32")/255., -1)
 
-            ret = {"image": img, "label": label, "mask": mask, "normalized_bbox": normalized_bbox}
+            ret = {"image": img, "label": label}
             datapoint_list.append(ret)
 
         batched_datapoint = {"is_training":True, "dropout_keep_prob":0.5}
-        for stackable_field in ["image", "label", "mask", "normalized_bbox"]:
+        for stackable_field in ["image", "label"]:#, "mask", "normalized_bbox"]:
             batched_datapoint[stackable_field] = np.stack([d[stackable_field] for d in datapoint_list])
         return batched_datapoint  
 
