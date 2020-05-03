@@ -4,7 +4,7 @@ import os
 from parse_dict import get_dict
 
 # base dir for multiple text datasets
-base_dir = '/data/datasets/text_recognition/AttentionOCR/'
+base_dir = '/data/datasets/text_recognition/ICDAR2019/'
 
 # font path for visualization
 font_path = './fonts/cn/SourceHanSans-Normal.ttf'

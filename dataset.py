@@ -165,6 +165,7 @@ class ART(Dataset):
     """
     def __init__(self, name='art'):
         super(ART, self).__init__(name=name)
+        self.transcripts = []
 
     def load_data(self, annotation_file=art_annotation):
         # pdb.set_trace()
@@ -236,6 +237,7 @@ class ART(Dataset):
                 self.masks.append(mask)
                 self.bboxes.append(bbox)
                 self.points.append(polygon)
+                self.transcripts.append(transcripts)
 
 
 
@@ -382,37 +384,37 @@ class ICDAR2017RCTW(Dataset):
                         self.points.append(polygon)
                         self.transcripts.append(label)
 
-if __name__=='__main__':
-    # LSVT = LSVT()
-    # LSVT.load_data()
-    # print(len(LSVT.filenames))
-
-    ART = ART()
-    ART.load_data()
-    print(len(ART.filenames))
-
-    # ReCTS = ReCTS()
-    # ReCTS.load_data()
-    # print(len(ReCTS.filenames))
-    
-    filenames = ART.filenames#LSVT.filenames + ART.filenames + ReCTS.filenames
-    labels = ART.labels#LSVT.labels + ART.labels + ReCTS.labels
-    masks = ART.masks#LSVT.masks + ART.masks + ReCTS.masks
-    bboxes = ART.bboxes#LSVT.bboxes + ART.bboxes + ReCTS.bboxes
-    points = ART.points#LSVT.points + ART.points + ReCTS.points
-
-    from sklearn.utils import shuffle
-    filenames, labels, masks, bboxes, points = shuffle(filenames, labels, masks, bboxes, points, random_state=0)
-    print(len(filenames))
-
-    dataset = {"filenames":filenames, "labels":labels, "masks":masks, "bboxes":bboxes, "points":points}
-    np.save(cfg.dataset_name, dataset)
-
-    
-    
-
-
-    
-    
+# if __name__=='__main__':
+#     # LSVT = LSVT()
+#     # LSVT.load_data()
+#     # print(len(LSVT.filenames))
+#
+#     ART = ART()
+#     ART.load_data()
+#     print(len(ART.filenames))
+#
+#     # ReCTS = ReCTS()
+#     # ReCTS.load_data()
+#     # print(len(ReCTS.filenames))
+#
+#     filenames = ART.filenames#LSVT.filenames + ART.filenames + ReCTS.filenames
+#     labels = ART.labels#LSVT.labels + ART.labels + ReCTS.labels
+#     masks = ART.masks#LSVT.masks + ART.masks + ReCTS.masks
+#     bboxes = ART.bboxes#LSVT.bboxes + ART.bboxes + ReCTS.bboxes
+#     points = ART.points#LSVT.points + ART.points + ReCTS.points
+#
+#     from sklearn.utils import shuffle
+#     filenames, labels, masks, bboxes, points = shuffle(filenames, labels, masks, bboxes, points, random_state=0)
+#     print(len(filenames))
+#
+#     dataset = {"filenames":filenames, "labels":labels, "masks":masks, "bboxes":bboxes, "points":points}
+#     np.save(cfg.dataset_name, dataset)
+#
+#
+#
+#
+#
+#
+#
     
     
