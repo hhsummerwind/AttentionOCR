@@ -39,8 +39,9 @@ seq_len = 32
 image_size = 299
 
 
-def init_ocr_model():
-    detection_pb = '/data/models/text_recognition/AttentionOCR/checkpoint/ICDAR_0.7.pb' # './checkpoint/ICDAR_0.7.pb'
+def init_ocr_model(detection=True):
+    if detection:
+        detection_pb = '/data/models/text_recognition/AttentionOCR/checkpoint/ICDAR_0.7.pb' # './checkpoint/ICDAR_0.7.pb'
     # recognition_checkpoint='/data/zhangjinjin/icdar2019/LSVT/full/recognition/checkpoint_3x_single_gpu/OCR-443861'
     # recognition_pb = './checkpoint/text_recognition_5435.pb' #
     recognition_pb = '/data/models/text_recognition/AttentionOCR/checkpoint/text_recognition.pb'
@@ -49,18 +50,22 @@ def init_ocr_model():
         with tf.device('/gpu:0'):
             tf_config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True),#, visible_device_list="9"),
                                        allow_soft_placement=True)
-
-            detection_model = TextDetection(detection_pb, tf_config, max_size=1600)
+            if detection:
+                detection_model = TextDetection(detection_pb, tf_config, max_size=1600)
             recognition_model = TextRecognition(recognition_pb, seq_len=27, config=tf_config)
     else:
         with tf.device('/cpu:0'):
             tf_config = tf.ConfigProto(allow_soft_placement=True)
 
-            detection_model = TextDetection(detection_pb, tf_config, max_size=1600)
+            if detection:
+                detection_model = TextDetection(detection_pb, tf_config, max_size=1600)
             recognition_model = TextRecognition(recognition_pb, seq_len=27, config=tf_config)
 
     label_dict = np.load('/data/models/text_recognition/AttentionOCR/reverse_label_dict_with_rects.npy', allow_pickle=True)[()] # reverse_label_dict_with_rects.npy  reverse_label_dict
-    return detection_model, recognition_model, label_dict
+    if detection:
+        return detection_model, recognition_model, label_dict
+    else:
+        return recognition_model, label_dict
 
 
 def poly2mask(vertex_row_coords, vertex_col_coords, shape):
@@ -232,12 +237,12 @@ def cal_clock(lis):
 
 
 def test_intigrate(detection_model, recognition_model, filename, label_dict):
-    key = os.path.basename(os.path.splitext(filename)[0])
+    key = os.path.basename(os.path.splitext(filename)[0]).replace('gt_', 'res_')
     result_dict = {key: []}
     image = cv2.imread(filename)
     vis_image = copy.deepcopy(image)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    pdb.set_trace()
+    # pdb.set_trace()
     r_boxes, polygons, scores = detection_model.predict(image)
     for r_box, polygon, score in zip(r_boxes, polygons, scores):
         mask, bbox = mask_with_points(polygon, vis_image.shape[0], vis_image.shape[1])
@@ -279,19 +284,52 @@ def test_intigrate(detection_model, recognition_model, filename, label_dict):
                                  "confidence": float(score)})
     return result_dict
 
-        # probs = probs[:min(len(preds) + 1, seq_len + 1)]
 
-        # out_f.write('image {}: {}, label = {}, prediction = {}, probs = {}, sim = {}\n'.format(i, filename, label,
-        #                                                                                        preds, probs, sim))
+def test_crop(recognition_model, filename, label_dict):
+    key = os.path.basename(os.path.splitext(filename)[0]).replace('gt_', 'res_')
+    result_dict = {key: []}
+    image = cv2.imread(filename)
+    # vis_image = copy.deepcopy(image)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # pdb.set_trace()
+    # r_boxes, polygons, scores = detection_model.predict(image)
+    # for r_box, polygon, score in zip(r_boxes, polygons, scores):
+    #     mask, bbox = mask_with_points(polygon, vis_image.shape[0], vis_image.shape[1])
+    #     masked_image = image * mask
+    #     masked_image = np.uint8(masked_image)
+    #     cropped_image = masked_image[max(0, bbox[0]):min(bbox[2], masked_image.shape[0]),
+    #                     max(0, bbox[1]):min(bbox[3], masked_image.shape[1]), :]
 
-        # total_num += 1
-        # Normalized_ED += sim
+    height, width = image.shape[:2]
+    test_size = 299
+    if height >= width:
+        scale = test_size / height
+        resized_image = cv2.resize(image, (0, 0), fx=scale, fy=scale)
+        print(resized_image.shape)
+        left_bordersize = (test_size - resized_image.shape[1]) // 2
+        right_bordersize = test_size - resized_image.shape[1] - left_bordersize
+        image_padded = cv2.copyMakeBorder(resized_image, top=0, bottom=0, left=left_bordersize,
+                                          right=right_bordersize, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+        image_padded = np.float32(image_padded) / 255.
+    else:
+        scale = test_size / width
+        resized_image = cv2.resize(image, (0, 0), fx=scale, fy=scale)
+        print(resized_image.shape)
+        top_bordersize = (test_size - resized_image.shape[0]) // 2
+        bottom_bordersize = test_size - resized_image.shape[0] - top_bordersize
+        image_padded = cv2.copyMakeBorder(resized_image, top=top_bordersize, bottom=bottom_bordersize, left=0,
+                                          right=0, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+        image_padded = np.float32(image_padded) / 255.
 
-    # print("total_num: %d, 1-N.E.D: %.4f, average time: %.4f" % (
-    # total_num, Normalized_ED / total_num, total_time / total_num))
+        image_padded = np.expand_dims(image_padded, 0)
+
+    preds, probs = recognition_model.predict(image_padded, label_dict, EOS='EOS')
+    # probs = probs[:min(len(preds) + 1, seq_len + 1)]
+    result_dict[key].append({"transcription": ''.join(preds)})
+    return result_dict
 
 
-def test_2019icdar_art_train_task2():
+def test_2019icdar_train_task2():
     parser = argparse.ArgumentParser(description='OCR')
     parser.add_argument('--checkpoint_path', type=str, help='path to tensorflow model',
                         default='./checkpoint/model-10000')
@@ -310,7 +348,7 @@ def test_2019icdar_art_train_task2():
     f.close()
 
 
-def test_2019icdar_art_test_task3():
+def test_2019icdar_test_task3():
     # parser = argparse.ArgumentParser(description='OCR')
     # parser.add_argument('--checkpoint_path', type=str, help='path to tensorflow model',
     #                     default='./checkpoint/model-10000')
@@ -333,7 +371,27 @@ def test_2019icdar_art_test_task3():
         t_end = time.time()
         result.update(result_dict)
         print("image {}: {}, time costs {}s.".format(i + 1, img_path, t_end - t_start))
-        break
+        # break
+
+    json.dump(result, open(log_path, 'w'))
+    # f = open(log_path, 'w')
+    # f.close()
+
+
+def test_2019icdar_test_task2():
+    log_path = '/data/models/text_recognition/AttentionOCR/task2/art/end_2_end_result_baseline.json'
+    img_paths = glob.glob('/data/datasets/text_recognition/ICDAR2019/art/test_part1_images/*') + \
+                glob.glob('/data/datasets/text_recognition/ICDAR2019/art/test_part2_images/*')
+
+    recognition_model, label_dict = init_ocr_model(detection=False)
+    result = dict()
+    for i, img_path in enumerate(img_paths):
+        t_start = time.time()
+        result_dict = test_crop(recognition_model, img_path, label_dict)
+        t_end = time.time()
+        result.update(result_dict)
+        print("image {}: {}, time costs {}s.".format(i + 1, img_path, t_end - t_start))
+        # break
 
     json.dump(result, open(log_path, 'w'))
     # f = open(log_path, 'w')
@@ -341,5 +399,6 @@ def test_2019icdar_art_test_task3():
 
 
 if __name__ == '__main__':
-    # test_2019icdar_art_train_task2()
-    test_2019icdar_art_test_task3()
+    # test_2019icdar_train_task2()
+    # test_2019icdar_test_task3()
+    test_2019icdar_test_task2()
