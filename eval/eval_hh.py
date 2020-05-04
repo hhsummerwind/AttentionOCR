@@ -380,8 +380,8 @@ def test_2019icdar_test_task3():
 
 def test_2019icdar_test_task2():
     log_path = '/data/models/text_recognition/AttentionOCR/task2/art/end_2_end_result_baseline.json'
-    img_paths = glob.glob('/data/datasets/text_recognition/ICDAR2019/art/test_part1_images/*') + \
-                glob.glob('/data/datasets/text_recognition/ICDAR2019/art/test_part2_images/*')
+    img_paths = glob.glob('/data/datasets/text_recognition/ICDAR2019/art/test_part1_task2_images/*') + \
+                glob.glob('/data/datasets/text_recognition/ICDAR2019/art/test_part2_task2_images/*')
 
     recognition_model, label_dict = init_ocr_model(detection=False)
     result = dict()
