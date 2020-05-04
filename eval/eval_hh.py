@@ -214,14 +214,31 @@ def eval_crop(detection_model, recognition_model, args, filenames, polygons, lab
     total_num, Normalized_ED / total_num, total_time / total_num))
 
 
+def cal_clock(lis):
+    max_x_ind = np.argmax(lis[:,0])
+    max_x_point = lis[max_x_ind]
+    prev = lis[max_x_ind - 1]
+    after_ind = max_x_ind + 1
+    if after_ind == len(lis):
+        after_ind = 0
+    after = lis[after_ind]
+    ab = max_x_point - prev
+    bc = after - max_x_point
+
+    if np.cross(ab, bc) > 0:
+        return True
+    else:
+        return False
+
+
 def test_intigrate(detection_model, recognition_model, filename, label_dict):
     key = os.path.basename(os.path.splitext(filename)[0])
     result_dict = {key: []}
     image = cv2.imread(filename)
     vis_image = copy.deepcopy(image)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    pdb.set_trace()
     r_boxes, polygons, scores = detection_model.predict(image)
-    # pdb.set_trace()
     for r_box, polygon, score in zip(r_boxes, polygons, scores):
         mask, bbox = mask_with_points(polygon, vis_image.shape[0], vis_image.shape[1])
         masked_image = image * mask
@@ -254,8 +271,12 @@ def test_intigrate(detection_model, recognition_model, filename, label_dict):
 
         preds, probs = recognition_model.predict(image_padded, label_dict, EOS='EOS')
         probs = probs[:min(len(preds) + 1, seq_len + 1)]
-        result_dict[key].append({"transcription": ''.join(preds).encode('unicode_escape'), "points": polygon.tolist(),
-                                 "confidence": score})
+        clockwise = cal_clock(polygon)
+        points = polygon.tolist()
+        if not clockwise:
+            points = points[::-1]
+        result_dict[key].append({"transcription": ''.join(preds), "points": points,
+                                 "confidence": float(score)})
     return result_dict
 
         # probs = probs[:min(len(preds) + 1, seq_len + 1)]
@@ -312,6 +333,8 @@ def test_2019icdar_art_test_task3():
         t_end = time.time()
         result.update(result_dict)
         print("image {}: {}, time costs {}s.".format(i + 1, img_path, t_end - t_start))
+        break
+
     json.dump(result, open(log_path, 'w'))
     # f = open(log_path, 'w')
     # f.close()
