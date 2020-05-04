@@ -321,8 +321,7 @@ def test_crop(recognition_model, filename, label_dict):
                                           right=0, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
         image_padded = np.float32(image_padded) / 255.
 
-        image_padded = np.expand_dims(image_padded, 0)
-
+    image_padded = np.expand_dims(image_padded, 0)
     preds, probs = recognition_model.predict(image_padded, label_dict, EOS='EOS')
     # probs = probs[:min(len(preds) + 1, seq_len + 1)]
     result_dict[key].append({"transcription": ''.join(preds)})
@@ -348,20 +347,10 @@ def test_2019icdar_train_task2():
     f.close()
 
 
-def test_2019icdar_test_task3():
-    # parser = argparse.ArgumentParser(description='OCR')
-    # parser.add_argument('--checkpoint_path', type=str, help='path to tensorflow model',
-    #                     default='./checkpoint/model-10000')
-    # args = parser.parse_args()
-    #
-    # from dataset import ART
-    #
-    # art = ART()
-    # art.load_data()
-    # print(len(art.filenames))
-    log_path = '/data/datasets/text_recognition/ICDAR2019/art/task3/end_2_end_result.json'
-    img_paths = glob.glob('/data/datasets/text_recognition/ICDAR2019/art/test_part1_images/*') + \
-                glob.glob('/data/datasets/text_recognition/ICDAR2019/art/test_part2_images/*')
+def test_2019icdar_test_intigrate():
+    log_path = '/data/datasets/text_recognition/ICDAR2019/lsvt/task2/end_2_end_result.json'
+    img_paths = glob.glob('/data/datasets/text_recognition/ICDAR2019/lsvt/test_part1_images/*') + \
+                glob.glob('/data/datasets/text_recognition/ICDAR2019/lsvt/test_part2_images/*')
 
     detection_model, recognition_model, label_dict = init_ocr_model()
     result = dict()
@@ -378,7 +367,7 @@ def test_2019icdar_test_task3():
     # f.close()
 
 
-def test_2019icdar_test_task2():
+def test_2019icdar_test_crop():
     log_path = '/data/models/text_recognition/AttentionOCR/task2/art/end_2_end_result_baseline.json'
     img_paths = glob.glob('/data/datasets/text_recognition/ICDAR2019/art/test_part1_task2_images/*') + \
                 glob.glob('/data/datasets/text_recognition/ICDAR2019/art/test_part2_task2_images/*')
@@ -400,5 +389,5 @@ def test_2019icdar_test_task2():
 
 if __name__ == '__main__':
     # test_2019icdar_train_task2()
-    # test_2019icdar_test_task3()
-    test_2019icdar_test_task2()
+    test_2019icdar_test_intigrate()
+    # test_2019icdar_test_crop()
